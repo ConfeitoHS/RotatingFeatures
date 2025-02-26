@@ -6,9 +6,12 @@ from typing import Tuple
 import hydra
 import torch
 from omegaconf import DictConfig
+import omegaconf
 from tqdm import tqdm
 
 from codebase.utils import data_utils, model_utils, utils
+
+import wandb
 
 
 def train(
@@ -29,7 +32,6 @@ def train(
 
     train_loader = data_utils.get_data(opt, "train")
     step = 0
-
     while step < opt.training.steps:
         for input_images, labels in train_loader:
             start_time = time.time()
@@ -53,6 +55,13 @@ def train(
             optimizer.step()
 
             # Print results.
+            wandb.log(
+                {
+                    "train/loss": loss,
+                    **dict([("train/" + k, v) for k, v in metrics.items()]),
+                },
+                step=step,
+            )
             if print_results:
                 iteration_time = time.time() - start_time
                 utils.print_results("train", step, iteration_time, metrics)
@@ -101,6 +110,15 @@ def validate_or_test(
 
     total_test_time = time.time() - test_time
     utils.print_results(partition, step, total_test_time, test_results)
+    if partition == "val":
+        wandb.log(
+            {
+                partition + "/loss": loss,
+                **dict([(partition + "/" + k, v) for k, v in metrics.items()]),
+            },
+            step=step,
+        )
+    torch.save(model.state_dict(), f"val_{step}.pt")
     model.train()
 
 
@@ -111,8 +129,15 @@ def my_main(opt: DictConfig) -> None:
     # Initialize model and optimizer.
     model, optimizer = model_utils.get_model_and_optimizer(opt)
 
+    wandb.init(
+        entity="ConfeitoHS",
+        project="RF-Tetromino",
+        config=omegaconf.OmegaConf.to_container(opt),
+    )
+
     step, model = train(opt, model, optimizer)
     validate_or_test(opt, step, model, "test")
+    wandb.finish()
 
 
 if __name__ == "__main__":

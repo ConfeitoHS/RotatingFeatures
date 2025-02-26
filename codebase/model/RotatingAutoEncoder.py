@@ -28,14 +28,17 @@ class RotatingAutoEncoder(nn.Module):
         # Create model.
         self.encoder = ConvEncoder.ConvEncoder(opt)
         self.decoder = ConvDecoder.ConvDecoder(
-            opt, self.encoder.channel_per_layer, self.encoder.latent_dim,
+            opt,
+            self.encoder.channel_per_layer,
+            self.encoder.latent_dim,
         )
 
         if self.opt.input.dino_processed:
             # Load DINO model and BN preprocess model that goes with it.
             self.dino = model_utils.load_dino_model()
             self.preprocess_model = nn.Sequential(
-                nn.BatchNorm2d(self.opt.input.channel), nn.ReLU(),
+                nn.BatchNorm2d(self.opt.input.channel),
+                nn.ReLU(),
             )
 
         # Create output model.

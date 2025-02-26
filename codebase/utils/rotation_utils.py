@@ -21,7 +21,9 @@ def add_rotation_dimensions(opt: DictConfig, x: torch.Tensor) -> torch.Tensor:
     """
 
     extra_dimensions = repeat(
-        torch.zeros_like(x), "b ... -> b n ...", n=opt.model.rotation_dimensions - 1,
+        torch.zeros_like(x),
+        "b ... -> b n ...",
+        n=opt.model.rotation_dimensions - 1,
     )
     return torch.cat((x[:, None], extra_dimensions), dim=1)
 
@@ -62,7 +64,9 @@ def run_evaluation(
 
     # Cluster rotating features according to their orientation.
     pred_labels = eval_utils.apply_kmeans(
-        opt, norm_rotating_output, labels["pixelwise_instance_labels"],
+        opt,
+        norm_rotating_output,
+        labels["pixelwise_instance_labels"],
     )
 
     # Compare predicted cluster labels with ground-truth labels.

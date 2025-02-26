@@ -109,6 +109,7 @@ def print_results(
     if metrics is not None:
         for key, value in metrics.items():
             print(f"{key}: {value:.4f} \t", end="")
+
     print()
 
 

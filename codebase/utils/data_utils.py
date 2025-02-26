@@ -5,7 +5,7 @@ import torch
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset
 
-from codebase.data import ShapesDataset, FoodSeg, PascalDataset
+from codebase.data import ShapesDataset, FoodSeg, PascalDataset, Tetrominoes
 
 
 def load_dataset(opt: DictConfig, partition: str) -> Dataset:
@@ -25,6 +25,8 @@ def load_dataset(opt: DictConfig, partition: str) -> Dataset:
         dataset = FoodSeg.FoodSeg(opt, partition)
     elif opt.input.dataset == 2:
         dataset = PascalDataset.PascalDataset(opt, partition)
+    elif opt.input.dataset == 3:
+        dataset = Tetrominoes.TetDataset(opt, partition)
     else:
         raise NotImplementedError("Dataset not implemented.")
     return dataset
@@ -81,7 +83,7 @@ def seed_worker(worker_id: int) -> None:
     Args:
         worker_id (int): Worker ID.
     """
-    worker_seed = torch.initial_seed() % 2 ** 32
+    worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
