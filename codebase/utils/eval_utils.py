@@ -7,10 +7,17 @@ from einops import rearrange
 from omegaconf import DictConfig
 from sklearn.cluster import KMeans
 from sklearn.metrics.cluster import adjusted_rand_score
+from sklearn.utils._testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from kmeans_pytorch import kmeans
 
 from codebase.utils import utils
 
 
+@ignore_warnings(category=ConvergenceWarning)
 def apply_kmeans(
     opt: DictConfig, norm_rotating_output: torch.Tensor, gt_labels: torch.Tensor
 ) -> np.ndarray:
@@ -66,6 +73,116 @@ def apply_kmeans(
         pred_labels[img_idx] = cluster_img
 
     return pred_labels
+
+
+def apply_tsne(
+    opt: DictConfig, norm_rotating_output: torch.Tensor, gt_labels: torch.Tensor
+):
+
+    pred_labels = apply_kmeans(opt, norm_rotating_output, gt_labels)
+
+    mbo_args = np.array(
+        [
+            mean_best_overlap_single_sample(
+                gt_labels["pixelwise_instance_labels"][b_idx].detach().cpu().numpy(),
+                pred_labels[b_idx],
+            )[1]
+            for b_idx in range(opt.input.batch_size)
+        ]
+    )
+
+    mbo_args = np.concatenate(
+        ((6 - mbo_args.sum(1))[:, None], mbo_args, np.zeros_like(mbo_args)), axis=1
+    )
+    from tqdm import tqdm
+
+    pred_mino = np.array(
+        [
+            (
+                np.concatenate(
+                    (
+                        gt_labels["shape"][b_idx].detach().cpu().numpy(),
+                        np.zeros_like(gt_labels["shape"][b_idx].detach().cpu().numpy()),
+                    )
+                )
+            )[mbo_args[b_idx][mbo_args[b_idx]][pred_labels[b_idx].astype(int)]]
+            for b_idx in tqdm(range(opt.input.batch_size))
+        ]
+    )
+    # print(pred_labels.astype(int))
+    # print(pred_mino)
+    # print(gt_labels["shape"][0])
+
+    # ex) mbo_args[0] is best match pred label for background
+    # ex) mbo_args[1] is best match pred label for label 1 in GT
+
+    # model = TSNE(verbose=1)
+    # model = PCA(n_components=2)
+    model = LinearDiscriminantAnalysis(n_components=2)
+    norm_rotating_output = rearrange(
+        norm_rotating_output.detach().cpu().numpy(), "b n c h w -> (b h w) (c n)"
+    )
+
+    pred_mino = rearrange(pred_mino, "b h w -> (b h w)")
+    idx = np.logical_not(pred_mino == 0)
+    return (
+        model.fit_transform(norm_rotating_output[idx], pred_mino[idx]),
+        pred_mino[idx],
+    )
+
+
+def apply_kmeans_gpu(
+    opt: DictConfig, norm_rotating_output: torch.Tensor, gt_labels: torch.Tensor
+) -> np.ndarray:
+    """
+    Apply k-means clustering to the reconstructed, normalized rotating features.
+
+    Args:
+        opt (DictConfig): Configuration options.
+        norm_rotating_output (torch.Tensor): Normalized rotating features, shape (b, n, c, h, w).
+        gt_labels (torch.Tensor): Ground-truth labels, shape (b, h, w).
+
+    Returns:
+        np.ndarray: Predicted labels.
+    """
+    num_clusters = opt.input.num_objects_per_img + 1
+
+    norm_rotating_output = rearrange(
+        norm_rotating_output.detach(), "b n c h w -> b h w (c n)"
+    )
+    pred_labels = torch.zeros(
+        (opt.input.batch_size, opt.input.image_size[0], opt.input.image_size[1])
+    )
+
+    if opt.evaluation.mask_overlap == 1:
+        # Remove overlap areas before applying k-means.
+        label_idx = torch.where(gt_labels != -1)
+
+        norm_rotating_output = norm_rotating_output[label_idx]
+    else:
+        norm_rotating_output = rearrange(norm_rotating_output, "b h w c -> b (h w) c")
+    for img_idx in range(opt.input.batch_size):
+        labels_, __annotations__ = kmeans(
+            X=norm_rotating_output[img_idx],
+            num_clusters=num_clusters,
+            device=torch.device("cuda:0"),
+        )
+
+        if opt.evaluation.mask_overlap == 1:
+            # Create result image: fill in with predicted labels & assign "none" label to overlap areas.
+            cluster_img = torch.zeros_like(pred_labels) + num_clusters
+            cluster_img[label_idx] = labels_.float()
+        else:
+            cluster_img = rearrange(
+                labels_,
+                "(h w) -> h w",
+                h=opt.input.image_size[0],
+                w=opt.input.image_size[1],
+            )
+
+        pred_labels[img_idx] = cluster_img
+
+    return pred_labels.cpu().numpy()
 
 
 def calc_ari_score(
@@ -149,7 +266,8 @@ def mean_best_overlap_single_sample(
 
     iou_matrix = compute_iou_matrix(gt_masks, pred_masks)
     best_iou = np.max(iou_matrix, axis=1)
-    return np.mean(best_iou)
+    best_iou_arg = np.argmax(iou_matrix, axis=1)
+    return np.mean(best_iou), best_iou_arg
 
 
 def calc_mean_best_overlap(
@@ -168,7 +286,7 @@ def calc_mean_best_overlap(
     """
     mean_best_overlap = np.array(
         [
-            mean_best_overlap_single_sample(gt_labels[b_idx], pred_labels[b_idx])
+            mean_best_overlap_single_sample(gt_labels[b_idx], pred_labels[b_idx])[0]
             for b_idx in range(opt.input.batch_size)
         ]
     )
@@ -209,7 +327,9 @@ def run_object_discovery_evaluation(
 
     if "pixelwise_class_labels" in gt_labels:
         metrics["MBO_c"] = calc_mean_best_overlap(
-            opt, gt_labels["pixelwise_class_labels"], pred_labels,
+            opt,
+            gt_labels["pixelwise_class_labels"],
+            pred_labels,
         )
     return metrics
 
@@ -235,7 +355,10 @@ def resize_pred_labels(
     resized_pred_labels = (
         torch.nn.functional.interpolate(
             torch.Tensor(pred_labels)[:, None],
-            size=(gt_labels.shape[1], gt_labels.shape[2],),
+            size=(
+                gt_labels.shape[1],
+                gt_labels.shape[2],
+            ),
             mode="nearest",
         )[:, 0]
         .numpy()

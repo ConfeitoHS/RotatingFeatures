@@ -40,25 +40,31 @@ class TetDataset(Dataset):
             if opt.input.colored:
                 file_name = Path(
                     self.root_dir,
-                    f"{opt.input.file_name}_Colored_{opt.input.condensed_level}_shifted.h5",
+                    f"{opt.input.file_name}_Color_Lv{opt.input.condensed_level}.h5",
                 )
 
             else:
                 file_name = Path(
                     self.root_dir,
-                    f"{opt.input.file_name}_Grayscale_{opt.input.condensed_level}_shifted.h5",
+                    f"{opt.input.file_name}_Gray_Lv{opt.input.condensed_level}.h5",
                 )
 
         else:
             raise Exception()
         h5_root += str(opt.input.num_answers)
+        print(h5_root)
         # dataset = np.load(file_name)
         hfp = h5py.File(file_name, "r")
         dataset = hfp[h5_root]
         self.images = np.array(dataset["image"]).astype(np.float32) / 255.0  # C H W
+        if opt.input.ceil_input:
+            self.images = np.ceil(self.images)
         self.pixelwise_instance_labels = np.array(dataset["mask"][:, 0, :]).astype(
             np.float32
         )  # multi, H, W
+        self.y = np.array(dataset["y_x_sh"][:, :, 0])
+        self.x = np.array(dataset["y_x_sh"][:, :, 1])
+        self.sh = np.array(dataset["y_x_sh"][:, :, 2])
         hfp.close()
 
     def __len__(self) -> int:
@@ -81,20 +87,24 @@ class TetDataset(Dataset):
             tuple: A tuple containing the input image and corresponding gt_labels.
         """
         input_image = self.images[idx]
-        labels = {"pixelwise_instance_labels": self.pixelwise_instance_labels[idx]}
+        labels = {
+            "pixelwise_instance_labels": self.pixelwise_instance_labels[idx],
+            "shape": self.sh[idx],
+        }
         return input_image, labels
 
 
 if __name__ == "__main__":
     opt = DictConfig(
         {
-            "cwd": "C:/Users/tydty/Desktop/code/RotatingFeatures",
+            "cwd": ".",
             "input": {
                 "load_path": "datasets/Tetrominoes",
                 "file_name": "Tetrominoes",
                 "colored": False,
-                "condensed_level": 3,
-                "num_answers": 2,
+                "condensed_level": 1,
+                "num_answers": 1,
+                "ceil_input": False,
             },
         }
     )
@@ -105,4 +115,4 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
     plt.imshow(image[0])
-    plt.show()
+    plt.savefig("asdf.png")

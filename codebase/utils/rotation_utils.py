@@ -44,6 +44,9 @@ def rescale_magnitude_rotating_features(
     return torch.nn.functional.normalize(x, dim=1) * scaling_factor[:, None]
 
 
+import numpy as np
+
+
 def run_evaluation(
     opt: DictConfig, rotation_output: torch.Tensor, labels: Dict[str, torch.Tensor]
 ) -> Dict[str, float]:
@@ -68,6 +71,13 @@ def run_evaluation(
         norm_rotating_output,
         labels["pixelwise_instance_labels"],
     )
+
+    X_embedded, targ = eval_utils.apply_tsne(opt, norm_rotating_output, labels)
+    np.save("out.npy", pred_labels)
+    np.save("ans.npy", labels["pixelwise_instance_labels"])
+
+    np.save("lda.npy", X_embedded)
+    np.save("targ.npy", targ)
 
     # Compare predicted cluster labels with ground-truth labels.
     return eval_utils.run_object_discovery_evaluation(opt, pred_labels, labels)
