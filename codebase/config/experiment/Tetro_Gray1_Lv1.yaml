@@ -24,14 +24,13 @@ model:
 training:
   learning_rate: 1e-2
   steps: 100000 # How many times to train on a single batch?
-  #weight_decay: 1e-6
+
   learning_rate_schedule: 1
   warmup_steps: 1000
-  #decay_log: 500
-  #lr_decay: 0.9
+
 
 evaluation:
   mask_overlap: 0  # If 1: Mask overlapping object areas while clustering orientations.
   test: True
   #out: True
-  load_file: ./outputs/Tetro_Gray1_Lv1/2025-02-28_17-52-46/3_Gray_1_Lv1_Step55000.pt
+  #load_file: ./outputs/Tetro_Gray1_Lv1/2025-02-28_17-52-46/3_Gray_1_Lv1_Step55000.pt

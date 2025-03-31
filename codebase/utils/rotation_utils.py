@@ -72,12 +72,13 @@ def run_evaluation(
         labels["pixelwise_instance_labels"],
     )
 
-    X_embedded, targ = eval_utils.apply_tsne(opt, norm_rotating_output, labels)
-    np.save("out.npy", pred_labels)
-    np.save("ans.npy", labels["pixelwise_instance_labels"])
+    if opt.evaluation.out:
+        X_embedded, targ = eval_utils.apply_tsne(opt, norm_rotating_output, labels)
+        np.save("out.npy", pred_labels)
+        np.save("ans.npy", labels["pixelwise_instance_labels"])
 
-    np.save("lda.npy", X_embedded)
-    np.save("targ.npy", targ)
+        np.save("lda.npy", X_embedded)
+        np.save("targ.npy", targ)
 
     # Compare predicted cluster labels with ground-truth labels.
     return eval_utils.run_object_discovery_evaluation(opt, pred_labels, labels)

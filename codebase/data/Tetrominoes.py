@@ -92,27 +92,3 @@ class TetDataset(Dataset):
             "shape": self.sh[idx],
         }
         return input_image, labels
-
-
-if __name__ == "__main__":
-    opt = DictConfig(
-        {
-            "cwd": ".",
-            "input": {
-                "load_path": "datasets/Tetrominoes",
-                "file_name": "Tetrominoes",
-                "colored": False,
-                "condensed_level": 1,
-                "num_answers": 1,
-                "ceil_input": False,
-            },
-        }
-    )
-    dataset = TetDataset(opt, "train")
-
-    loader = iter(dataset)
-    image, f = next(loader)
-    from matplotlib import pyplot as plt
-
-    plt.imshow(image[0])
-    plt.savefig("asdf.png")

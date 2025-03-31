@@ -21,8 +21,8 @@ model:
 
 
 training:
-  continue_train: True
-  load_file : "./outputs/Tetro_Gray1_Lv1/2025-02-28_17-52-46/3_Gray_1_Lv1_Step55000.pt"
+  #continue_train: True
+  #load_file : "./outputs/Tetro_Gray1_Lv1/2025-02-28_17-52-46/3_Gray_1_Lv1_Step55000.pt"
   learning_rate: 1e-2
   steps: 100000 # How many times to train on a single batch?
   learning_rate_schedule: 1
@@ -30,6 +30,6 @@ training:
 
 evaluation:
   mask_overlap: 0  # If 1: Mask overlapping object areas while clustering orientations.
-  load_file: outputs/Tetro_Gray1_Lv3/2025-03-03_14-25-16/3_Gray_1_Lv3_Step95000.pt
+  #load_file: outputs/Tetro_Gray1_Lv3/2025-03-03_14-25-16/3_Gray_1_Lv3_Step95000.pt
   #out : True
   test: True

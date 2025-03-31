@@ -152,6 +152,8 @@ def my_main(opt: DictConfig) -> None:
         model.load_state_dict(torch.load(opt.evaluation.load_file))
         validate_or_test(opt, 0, model, "test")
         exit()
+    
+    #logging wandb
     expname = HydraConfig.get().runtime.choices.experiment.replace("Tetro_", "")
     lr = opt.training.learning_rate
     bat = opt.input.batch_size
@@ -169,7 +171,6 @@ def my_main(opt: DictConfig) -> None:
     if opt.input.ceil_input:
         nnaa.append("Ceil")
     wandb.init(
-        entity="ConfeitoHS",
         project="RF-Tetromino",
         config=omegaconf.OmegaConf.to_container(opt),
         group=expname,

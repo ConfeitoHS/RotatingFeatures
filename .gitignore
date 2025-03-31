@@ -32,3 +32,4 @@ datasets/*
 
 outputs/
 wandb/
+*.npy
